@@ -4,7 +4,8 @@ Panel interactivo de la deuda con proveedores y prestadores de servicios de **Co
 
 ## Qué incluye
 
-- **Matriz de burbujas** (importancia operativa vs. deuda o histórico pagado; tamaño = deuda) y **ranking de barras**, con transición animada entre ambas vistas.
+- **Matriz de burbujas única**: eje X = importancia operativa, eje Y = histórico pagado, tamaño de la burbuja = deuda vigente (metodología de la minuta del 26-10-2026). También hay una vista de **ranking de barras**, con transición animada entre ambas.
+- Cuadrantes: importancia alta (> celda B2) o baja × histórico alto (≥ promedio) o bajo.
 - **Filtros**: nombre, tipo (proveedor / prestador / ambos), cuadrante, rango de importancia, orden (deuda, importancia, histórico, nombre) y Top N.
 - **Resumen** que cambia con los filtros: cantidad de empresas, total deuda, total prestadores, total proveedores, composición, deuda por cuadrante y concentración.
 - **Aviso de doble categoría**: lista las empresas que son proveedor y prestador a la vez, con su monto, para que esa deuda no se sume dos veces. El total nunca la duplica.

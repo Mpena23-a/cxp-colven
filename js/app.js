@@ -13,7 +13,6 @@
     data: null,
     f: { ...DEFAULT_F },
     view: 'matriz',
-    y: 'deuda',
     sel: new Set(),
     tableSort: null,
     list: [],
@@ -48,7 +47,6 @@
     $('#fImpMax').innerHTML = opts.map(v => `<option value="${v}">${v}</option>`).join('');
     state.f.impMin = opts[0]; state.f.impMax = opts[opts.length - 1];
     $('#fImpMin').value = state.f.impMin; $('#fImpMax').value = state.f.impMax;
-    $('#vY').style.display = d.tieneHistorico ? '' : 'none';
     $('#fSort option[value="historico"]').disabled = !d.tieneHistorico;
     $('#source').textContent = d.fuente;
     $('#footSrc').textContent = `${d.filas.length} empresas · fuente: ${d.fuente}`;
@@ -162,8 +160,8 @@
   }
   function buildMatrix(TT, opts) {
     const d = state.data, list = state.list;
-    const yKey = state.y;
-    const avgY = yKey === 'historico' ? d.promHist : d.promDeuda;
+    const yKey = d.ejeY;
+    const avgY = d.promY;
     const divX = d.divisoriaX + (Number.isInteger(d.divisoriaX) ? 0.5 : 0);
     const xMin = Math.floor(d.minImp) - 1, xMax = Math.ceil(d.maxImp) + 1;
     const W = opts.w || (main ? main.getWidth() : 1200), H = opts.h || (main ? main.getHeight() : 700);
@@ -184,9 +182,7 @@
         label: { show: topIds.has(f.id) || sel },
       };
     });
-    const qTxt = (n, imp, mon) => yKey === 'historico'
-      ? `Importancia ${imp}, histórico ${mon === 'alta' ? 'alto' : 'bajo'}`
-      : `${n} · Importancia ${imp}, deuda ${mon}`;
+    const qTxt = n => `${n} · ${CUADRANTES[n].short}`;
     const qLabel = (txt, pos) => ({ name: txt, label: { show: true, position: pos, color: TT.muted, fontSize: 11, fontFamily: 'Inter', fontWeight: 600, distance: 8 } });
     return {
       backgroundColor: 'transparent',
@@ -322,11 +318,12 @@
     main.setOption(buildMain(T), { notMerge: !!fresh, replaceMerge: fresh ? undefined : ['series', 'xAxis', 'yAxis', 'dataZoom'] });
     $('#chartTitle').textContent = state.view === 'ranking'
       ? 'Ranking por ' + ({ deuda: 'deuda vigente', importancia: 'importancia operativa', historico: 'histórico pagado', empresa: 'deuda vigente' }[state.f.sort])
-      : 'Matriz de importancia operativa vs. ' + (state.y === 'historico' ? 'histórico pagado' : 'deuda');
+      : 'Matriz: importancia operativa vs. ' + (state.data.ejeY === 'historico' ? 'histórico pagado' : 'deuda');
     $('#chartHint').textContent = state.view === 'ranking'
       ? (state.list.length > 22 ? 'Desplaza con la rueda del ratón o la barra lateral · clic para seleccionar' : 'Clic en una barra para seleccionarla')
-      : 'Tamaño del punto = deuda vigente · clic para seleccionar empresas';
-    $('#vY').classList.toggle('disabled', state.view === 'ranking');
+      : (state.data.ejeY === 'historico'
+        ? 'Eje vertical = histórico pagado · tamaño de la burbuja = deuda vigente · clic para seleccionar empresas'
+        : 'El Excel no trae «Histórico pagado»: el eje vertical muestra la deuda · tamaño = deuda vigente');
   }
 
   /* ---------------- Leyenda ---------------- */
@@ -338,7 +335,7 @@
       <button class="lg-item ${counts[t] ? '' : 'off'}" data-f="${map[t] || ''}" title="Filtrar por ${esc(C.TIPO_CORTO[t])}">
         <i style="background:${T.tipo[t]}"></i>${esc(C.TIPO_CORTO[t])} <span>${counts[t] || 0}</span>
       </button>`).join('') +
-      (state.view === 'matriz' ? `<span class="lg-size"><i class="s1"></i><i class="s2"></i><i class="s3"></i>Tamaño = deuda</span>` : '');
+      (state.view === 'matriz' ? sizeLegend() : '');
   }
 
   /* ---------------- Resumen ---------------- */
@@ -401,7 +398,7 @@
 
   function renderQuad() {
     const d = state.data;
-    $('#quadHint').innerHTML = `Importancia <b>alta</b> = mayor que ${d.divisoriaX} · Deuda <b>alta</b> = igual o mayor al promedio (${moneyShort(d.promDeuda)})`;
+    $('#quadHint').innerHTML = `Importancia <b>alta</b> = mayor que ${d.divisoriaX} · ${d.ejeY === 'historico' ? 'Histórico' : 'Deuda'} <b>alto</b> = igual o mayor al promedio (${moneyShort(d.promY)}) · la barra suma la deuda vigente`;
     const vals = [1, 2, 3, 4].map(q => {
       const l = state.list.filter(f => f.cuadrante === q);
       return { q, v: l.reduce((a, f) => a + f.deuda, 0), n: l.length };
@@ -437,6 +434,17 @@
       </div>`;
   }
 
+  /** Leyenda de tamaños con montos reales de deuda. */
+  function sizeLegend() {
+    const max = state.data.maxDeudaAll || 1, W = main ? main.getWidth() : 1200;
+    const nice = v => { const p = Math.pow(10, Math.floor(Math.log10(v))); return Math.round(v / p) * p; };
+    const vals = [...new Set([nice(max * 0.1), nice(max * 0.4), nice(max)])];
+    return `<span class="lg-size"><span class="lg-size-t">Tamaño = deuda vigente</span>${vals.map(v => {
+      const s = Math.round(bubbleSize(v, W));
+      return `<span class="lg-bub"><i style="width:${s}px;height:${s}px"></i>${moneyShort(v)}</span>`;
+    }).join('')}</span>`;
+  }
+
   function renderCriteria() {
     const d = state.data, n = d.filas.length;
     const card = (icon, title, highTxt, lowTxt, note) => `
@@ -459,8 +467,8 @@
     const divX = d.divisoriaX;
     $('#criteria').innerHTML =
       `<div class="crit-head"><h2>¿Desde cuánto es alto o bajo?</h2><span class="hint">Valores en dólares (${C.CFG.moneda || 'USD'}) · calculados sobre las ${n} empresas del archivo · no cambian con los filtros</span></div>` +
-      card(ico.deuda, 'Deuda vigente', `desde ${money(d.promDeuda)}`, `menos de ${money(d.promDeuda)}`, 'Divisoria = promedio de la deuda. Define los cuadrantes 1 a 4.') +
-      (d.tieneHistorico ? card(ico.hist, 'Histórico pagado', `desde ${money(d.promHist)}`, `menos de ${money(d.promHist)}`, 'Divisoria = promedio del histórico. Se usa con «Eje Y: Histórico pagado».') : '') +
+      (d.tieneHistorico ? card(ico.hist, 'Histórico pagado · eje vertical', `desde ${money(d.promHist)}`, `menos de ${money(d.promHist)}`, 'Divisoria = promedio del histórico. Es la línea punteada horizontal y define los cuadrantes 1 a 4.') : '') +
+      card(ico.deuda, 'Deuda vigente · tamaño de la burbuja', `desde ${money(d.promDeuda)}`, `menos de ${money(d.promDeuda)}`, 'Divisoria = promedio de la deuda. A mayor deuda, más grande la burbuja.') +
       card(ico.imp, 'Importancia operativa', `mayor que ${divX}`, `${divX} o menos`, `Divisoria tomada de la celda B2 del Excel.`);
   }
 
@@ -589,7 +597,6 @@
       syncDir(); update(true);
     });
     segment('#vView', v => { state.view = v; update(); });
-    segment('#vY', v => { if (state.view === 'ranking') return; state.y = v; update(); });
 
     $('#legend').addEventListener('click', e => {
       const b = e.target.closest('.lg-item'); if (!b || !b.dataset.f) return;

@@ -56,10 +56,10 @@
       <span class="f-label">Cuadrante</span>
       <select id="fQuad">
         <option value="0">Todos</option>
-        <option value="1">1 · Importancia alta, deuda alta</option>
-        <option value="2">2 · Importancia alta, deuda baja</option>
-        <option value="3">3 · Importancia baja, deuda alta</option>
-        <option value="4">4 · Importancia baja, deuda baja</option>
+        <option value="1">1 · Importancia alta, histórico alto</option>
+        <option value="2">2 · Importancia alta, histórico bajo</option>
+        <option value="3">3 · Importancia baja, histórico alto</option>
+        <option value="4">4 · Importancia baja, histórico bajo</option>
       </select>
     </div>
 
@@ -103,8 +103,8 @@
     <section class="card chart-card">
       <div class="card-head">
         <div>
-          <h2 id="chartTitle">Matriz de importancia operativa vs. deuda</h2>
-          <p class="hint" id="chartHint">Tamaño del punto = deuda vigente · clic para seleccionar empresas</p>
+          <h2 id="chartTitle">Matriz: importancia operativa vs. histórico pagado</h2>
+          <p class="hint" id="chartHint">Eje vertical = histórico pagado · tamaño de la burbuja = deuda vigente · clic para seleccionar empresas</p>
         </div>
         <div class="head-tools">
           <div class="seg seg-sm" id="vView">
@@ -112,10 +112,6 @@
               <svg viewBox="0 0 24 24"><circle cx="7" cy="15" r="3"/><circle cx="15" cy="8" r="4"/><circle cx="18" cy="17" r="2"/></svg>Matriz</button>
             <button data-v="ranking" title="Ranking de barras">
               <svg viewBox="0 0 24 24"><path d="M4 6h14M4 12h10M4 18h6"/></svg>Ranking</button>
-          </div>
-          <div class="seg seg-sm" id="vY" title="Eje vertical de la matriz">
-            <button data-v="deuda" class="on">Eje Y: Deuda</button>
-            <button data-v="historico">Eje Y: Histórico pagado</button>
           </div>
           <div class="menu">
             <button class="btn btn-ghost btn-sm" id="btnExport" aria-haspopup="true">

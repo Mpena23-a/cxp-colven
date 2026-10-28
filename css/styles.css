@@ -327,3 +327,9 @@ select option { background: #FFFFFF; color: var(--text); }
 .crit-tag.lo { background: var(--surface-3); color: var(--text-2); }
 .crit-note { font-size: 11.5px; color: var(--muted); line-height: 1.35; }
 @media (max-width: 980px) { .criteria { grid-template-columns: 1fr; } }
+
+/* leyenda de tamaño con montos */
+.lg-size { gap: 12px; }
+.lg-size-t { margin-right: 2px; }
+.lg-bub { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--text-2); font-weight: 600; }
+.lg-bub i { display: inline-block; border-radius: 50%; border: 1.5px solid var(--muted); background: rgba(118, 123, 159, .12); flex: none; }

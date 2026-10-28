@@ -170,9 +170,15 @@
     const promDeuda = filas.reduce((s, f) => s + f.deuda, 0) / (filas.length || 1);
     const conHist = filas.filter(f => f.historico != null);
     const promHist = conHist.reduce((s, f) => s + f.historico, 0) / (conHist.length || 1);
+    // Eje vertical de la matriz = histórico pagado (metodología minuta 26-10-2026).
+    // Si el Excel no trae esa columna, se usa la deuda como respaldo.
+    const tieneHistorico = raw.tieneHistorico !== false && conHist.length > 0;
+    const ejeY = tieneHistorico ? 'historico' : 'deuda';
+    const promY = tieneHistorico ? promHist : promDeuda;
+    setCuadrantes(ejeY);
     filas.forEach(f => {
       const alta = f.importancia != null && f.importancia > divisoriaX;
-      const altoMonto = f.deuda >= promDeuda;
+      const altoMonto = (ejeY === 'historico' ? (f.historico ?? 0) : f.deuda) >= promY;
       f.cuadrante = alta ? (altoMonto ? 1 : 2) : (altoMonto ? 3 : 4);
     });
     // duplicados probables por nombre normalizado
@@ -181,8 +187,8 @@
     filas.forEach(f => { (groups[key(f.empresa)] = groups[key(f.empresa)] || []).push(f.empresa); });
     const duplicados = Object.values(groups).filter(g => g.length > 1);
     return {
-      filas, divisoriaX, promDeuda, promHist, minImp, maxImp, duplicados,
-      tieneHistorico: raw.tieneHistorico !== false && conHist.length > 0,
+      filas, divisoriaX, promDeuda, promHist, promY, ejeY, minImp, maxImp, duplicados,
+      tieneHistorico,
       fuente: fuente || '',
     };
   }
@@ -225,12 +231,17 @@
     return s;
   }
 
-  const CUADRANTES = {
-    1: { label: 'Importancia alta · Deuda alta', short: 'Importancia alta, deuda alta' },
-    2: { label: 'Importancia alta · Deuda baja', short: 'Importancia alta, deuda baja' },
-    3: { label: 'Importancia baja · Deuda alta', short: 'Importancia baja, deuda alta' },
-    4: { label: 'Importancia baja · Deuda baja', short: 'Importancia baja, deuda baja' },
-  };
+  /* Cuadrantes de la matriz: importancia (eje X) × histórico pagado (eje Y). */
+  const CUADRANTES = {};
+  function setCuadrantes(ejeY) {
+    const w = ejeY === 'historico' ? ['histórico alto', 'histórico bajo'] : ['deuda alta', 'deuda baja'];
+    const def = { 1: ['alta', w[0]], 2: ['alta', w[1]], 3: ['baja', w[0]], 4: ['baja', w[1]] };
+    Object.keys(def).forEach(k => {
+      const [imp, mon] = def[k];
+      CUADRANTES[k] = { label: `Importancia ${imp} · ${mon[0].toUpperCase() + mon.slice(1)}`, short: `Importancia ${imp}, ${mon}` };
+    });
+  }
+  setCuadrantes('historico');
 
   /* ---------- Animación de cifras ---------- */
   function countUp(el, to, fmt, dur = 700) {
@@ -335,7 +346,8 @@
       <div class="tt-tipo"><i style="background:${c}"></i>${esc(TIPO_CORTO[f.tipo])}</div>
       <table>
         <tr><td>Deuda vigente</td><td><b>${money(f.deuda)}</b></td></tr>
-        ${f.historico != null ? `<tr><td>Histórico pagado</td><td>${money(f.historico)}</td></tr>` : ''}
+        ${f.historico != null ? `<tr><td>Histórico pagado</td><td>${money(f.historico)}</td></tr>
+        <tr><td>Deuda sobre histórico</td><td>${f.historico ? pct(f.deuda / f.historico) : '—'}</td></tr>` : ''}
         <tr><td>Importancia operativa</td><td>${f.importancia ?? '—'}</td></tr>
         <tr><td>Cuadrante</td><td>${CUADRANTES[f.cuadrante].label}</td></tr>
         ${extra || ''}
