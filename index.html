@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cuentas por Pagar · COLVEN</title>
+  <meta name="description" content="Dashboard de cuentas por pagar a proveedores y prestadores de servicios de Colven Business & Corp.">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="assets/logo-colven.png" alt="Colven Business Corp." class="brand-logo">
+      <div class="brand-sep"></div>
+      <div>
+        <h1>Cuentas por pagar<span id="ribbon" class="ribbon" hidden>Prototipo · cifras de ejemplo</span></h1>
+        <p class="sub">Proveedores y prestadores de servicios · <span id="corte"></span></p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span class="source" id="source" title="Archivo de datos cargado"></span>
+      <label class="btn btn-ghost" title="Cargar otro Excel solo en este navegador (no modifica el repositorio)">
+        <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+        Cargar Excel
+        <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" hidden>
+      </label>
+      <button class="btn btn-primary" id="btnCompare" disabled>
+        <svg viewBox="0 0 24 24"><path d="M4 20V10m6 10V4m6 16v-7m4 7H2"/></svg>
+        Analizar selección <span class="pill" id="selCount">0</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===================== FILTROS ===================== -->
+  <section class="filters" aria-label="Filtros">
+    <div class="f-group f-search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" id="fSearch" placeholder="Buscar por nombre…" autocomplete="off">
+    </div>
+
+    <div class="f-group">
+      <span class="f-label">Tipo</span>
+      <div class="seg" id="fTipo" role="radiogroup">
+        <button data-v="all" class="on">Todos</button>
+        <button data-v="prov"><i class="dot" data-t="Proveedor"></i>Proveedores</button>
+        <button data-v="serv"><i class="dot" data-t="Prestador de servicios"></i>Prestadores</button>
+        <button data-v="ambos"><i class="dot" data-t="Ambos"></i>Ambos</button>
+      </div>
+    </div>
+
+    <div class="f-group">
+      <span class="f-label">Cuadrante</span>
+      <select id="fQuad">
+        <option value="0">Todos</option>
+        <option value="1">1 · Alta importancia / Alto monto</option>
+        <option value="2">2 · Alta importancia / Bajo monto</option>
+        <option value="3">3 · Baja importancia / Alto monto</option>
+        <option value="4">4 · Baja importancia / Bajo monto</option>
+      </select>
+    </div>
+
+    <div class="f-group">
+      <span class="f-label">Importancia</span>
+      <select id="fImpMin"></select><span class="f-to">a</span><select id="fImpMax"></select>
+    </div>
+
+    <div class="f-group">
+      <span class="f-label">Ordenar por</span>
+      <select id="fSort">
+        <option value="deuda">Deuda</option>
+        <option value="importancia">Importancia</option>
+        <option value="historico">Histórico pagado</option>
+        <option value="empresa">Nombre</option>
+      </select>
+      <button class="icon-btn" id="fDir" title="Invertir orden" aria-label="Invertir orden">
+        <svg viewBox="0 0 24 24"><path d="M7 4v16m0 0-3-3m3 3 3-3M17 20V4m0 0-3 3m3-3 3 3"/></svg>
+      </button>
+    </div>
+
+    <div class="f-group">
+      <span class="f-label">Mostrar</span>
+      <select id="fTop">
+        <option value="0">Todos</option>
+        <option value="5">Top 5</option>
+        <option value="10">Top 10</option>
+        <option value="20">Top 20</option>
+        <option value="30">Top 30</option>
+      </select>
+    </div>
+
+    <button class="btn btn-link" id="fReset">Restablecer</button>
+  </section>
+
+  <!-- ===================== PRINCIPAL ===================== -->
+  <main class="layout">
+    <section class="card chart-card">
+      <div class="card-head">
+        <div>
+          <h2 id="chartTitle">Matriz de importancia operativa vs. deuda</h2>
+          <p class="hint" id="chartHint">Tamaño del punto = deuda vigente · clic para seleccionar empresas</p>
+        </div>
+        <div class="head-tools">
+          <div class="seg seg-sm" id="vView">
+            <button data-v="matriz" class="on" title="Matriz de burbujas">
+              <svg viewBox="0 0 24 24"><circle cx="7" cy="15" r="3"/><circle cx="15" cy="8" r="4"/><circle cx="18" cy="17" r="2"/></svg>Matriz</button>
+            <button data-v="ranking" title="Ranking de barras">
+              <svg viewBox="0 0 24 24"><path d="M4 6h14M4 12h10M4 18h6"/></svg>Ranking</button>
+          </div>
+          <div class="seg seg-sm" id="vY" title="Eje vertical de la matriz">
+            <button data-v="deuda" class="on">Eje Y: Deuda</button>
+            <button data-v="historico">Eje Y: Histórico pagado</button>
+          </div>
+          <div class="menu">
+            <button class="btn btn-ghost btn-sm" id="btnExport" aria-haspopup="true">
+              <svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4-4m4 4 4-4M4 20h16"/></svg>Imagen</button>
+            <div class="menu-list" id="exportMenu" hidden>
+              <button data-e="dark">PNG · fondo Colven (con resumen)</button>
+              <button data-e="light">PNG · fondo blanco (para informes)</button>
+              <button data-e="transparent">PNG · solo gráfico, transparente</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div id="mainChart" class="chart"></div>
+      <div class="sel-bar" id="selBar" hidden>
+        <span id="selText"></span>
+        <button class="btn btn-link" id="selVisible">Seleccionar todo lo visible</button>
+        <button class="btn btn-link" id="selClear">Limpiar selección</button>
+      </div>
+    </section>
+
+    <aside class="summary" aria-label="Resumen">
+      <div class="summary-head">
+        <h2>Resumen</h2>
+        <span class="scope" id="scope">Todas las empresas</span>
+      </div>
+      <div class="kpis">
+        <div class="kpi">
+          <span class="kpi-label">Cantidad de empresas</span>
+          <span class="kpi-value" id="kN">0</span>
+          <span class="kpi-sub" id="kNsub"></span>
+        </div>
+        <div class="kpi kpi-hero">
+          <span class="kpi-label">Total deuda</span>
+          <span class="kpi-value" id="kTotal">$0</span>
+          <span class="kpi-sub" id="kTotalSub"></span>
+        </div>
+        <div class="kpi" data-t="Prestador de servicios">
+          <span class="kpi-label"><i class="dot" data-t="Prestador de servicios"></i>Total prestadores de servicios</span>
+          <span class="kpi-value" id="kServ">$0</span>
+          <span class="kpi-sub" id="kServSub"></span>
+        </div>
+        <div class="kpi" data-t="Proveedor">
+          <span class="kpi-label"><i class="dot" data-t="Proveedor"></i>Total proveedores</span>
+          <span class="kpi-value" id="kProv">$0</span>
+          <span class="kpi-sub" id="kProvSub"></span>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="block-head"><h3>Composición de la deuda</h3><span class="hint">sin doble conteo</span></div>
+        <div class="compo" id="compo"></div>
+      </div>
+
+      <div class="block">
+        <div class="block-head"><h3>Deuda por cuadrante</h3></div>
+        <div id="quadChart" class="mini-chart"></div>
+      </div>
+
+      <div class="block mini-stats">
+        <div><span class="kpi-label">Concentración Top 5</span><b id="kTop5">0%</b></div>
+        <div><span class="kpi-label">Deuda promedio</span><b id="kAvg">$0</b></div>
+        <div><span class="kpi-label">Mayor acreedor</span><b id="kMax" class="ellipsis">—</b></div>
+      </div>
+    </aside>
+
+    <!-- Aviso de empresas en ambas categorías -->
+    <section class="notice" id="overlap" hidden></section>
+
+    <!-- Tabla -->
+    <section class="card table-card">
+      <div class="card-head">
+        <div>
+          <h2>Detalle</h2>
+          <p class="hint">Marca las casillas para analizar empresas en otra ventana</p>
+        </div>
+        <div class="head-tools">
+          <button class="btn btn-ghost btn-sm" id="btnCsv">
+            <svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4-4m4 4 4-4M4 20h16"/></svg>CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="grid" id="grid">
+          <thead>
+            <tr>
+              <th class="c-chk"><input type="checkbox" id="chkAll" aria-label="Seleccionar todas las visibles"></th>
+              <th data-s="empresa">Empresa</th>
+              <th data-s="tipo">Tipo</th>
+              <th data-s="importancia" class="num">Importancia</th>
+              <th data-s="deuda" class="num">Deuda</th>
+              <th data-s="pct" class="num">% deuda</th>
+              <th data-s="historico" class="num">Histórico pagado</th>
+              <th data-s="cuadrante">Cuadrante</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="dq" id="dq" hidden></section>
+  </main>
+
+  <footer class="foot">
+    <span>Colven Business &amp; Corp. · Dirección de Finanzas</span>
+    <span id="footSrc"></span>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="lib/echarts.min.js"></script>
+  <script src="lib/xlsx.full.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/data-fallback.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
