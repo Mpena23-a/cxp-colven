@@ -56,10 +56,10 @@
       <span class="f-label">Cuadrante</span>
       <select id="fQuad">
         <option value="0">Todos</option>
-        <option value="1">1 · Alta importancia / Alto monto</option>
-        <option value="2">2 · Alta importancia / Bajo monto</option>
-        <option value="3">3 · Baja importancia / Alto monto</option>
-        <option value="4">4 · Baja importancia / Bajo monto</option>
+        <option value="1">1 · Importancia alta, deuda alta</option>
+        <option value="2">2 · Importancia alta, deuda baja</option>
+        <option value="3">3 · Importancia baja, deuda alta</option>
+        <option value="4">4 · Importancia baja, deuda baja</option>
       </select>
     </div>
 
@@ -97,6 +97,9 @@
 
   <!-- ===================== PRINCIPAL ===================== -->
   <main class="layout">
+    <!-- Criterios: a partir de qué monto se considera alto o bajo -->
+    <section class="criteria" id="criteria" aria-label="Criterios de clasificación"></section>
+
     <section class="card chart-card">
       <div class="card-head">
         <div>
@@ -168,12 +171,12 @@
       </div>
 
       <div class="block">
-        <div class="block-head"><h3>Deuda por cuadrante</h3></div>
+        <div class="block-head block-head-col"><h3>Deuda por cuadrante</h3><span class="hint" id="quadHint"></span></div>
         <div id="quadChart" class="mini-chart"></div>
       </div>
 
       <div class="block mini-stats">
-        <div><span class="kpi-label">Concentración Top 5</span><b id="kTop5">0%</b></div>
+        <div><span class="kpi-label">Concentración en las 5 mayores deudas<small>% de la deuda en pantalla</small></span><b id="kTop5">0%</b></div>
         <div><span class="kpi-label">Deuda promedio</span><b id="kAvg">$0</b></div>
         <div><span class="kpi-label">Mayor acreedor</span><b id="kMax" class="ellipsis">—</b></div>
       </div>

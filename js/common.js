@@ -226,10 +226,10 @@
   }
 
   const CUADRANTES = {
-    1: { label: 'Alta importancia · Alto monto', short: 'Prioridad alta' },
-    2: { label: 'Alta importancia · Bajo monto', short: 'Estratégico al día' },
-    3: { label: 'Baja importancia · Alto monto', short: 'Revisar' },
-    4: { label: 'Baja importancia · Bajo monto', short: 'Bajo impacto' },
+    1: { label: 'Importancia alta · Deuda alta', short: 'Importancia alta, deuda alta' },
+    2: { label: 'Importancia alta · Deuda baja', short: 'Importancia alta, deuda baja' },
+    3: { label: 'Importancia baja · Deuda alta', short: 'Importancia baja, deuda alta' },
+    4: { label: 'Importancia baja · Deuda baja', short: 'Importancia baja, deuda baja' },
   };
 
   /* ---------- Animación de cifras ---------- */

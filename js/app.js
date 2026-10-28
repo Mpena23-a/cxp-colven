@@ -53,6 +53,7 @@
     $('#source').textContent = d.fuente;
     $('#footSrc').textContent = `${d.filas.length} empresas · fuente: ${d.fuente}`;
     renderDQ();
+    renderCriteria();
     update(true);
   }
 
@@ -177,13 +178,15 @@
         value: [f.importancia + (offs[f.id] || 0), yKey === 'historico' ? (f.historico ?? 0) : f.deuda, f.deuda],
         symbolSize: bubbleSize(f.deuda, W),
         itemStyle: {
-          color: TT.tipo[f.tipo], opacity: state.sel.size && !sel && !opts.exporting ? 0.45 : 0.9,
-          borderColor: sel ? TT.ring : TT.surface, borderWidth: sel ? 3 : 1.5,
-          shadowBlur: sel ? 14 : 0, shadowColor: sel ? TT.tipo[f.tipo] : 'transparent',
+          color: TT.tipo[f.tipo], opacity: state.sel.size && !sel && !opts.exporting ? 0.3 : 1,
+          borderColor: TT.surface, borderWidth: sel ? 2.5 : 1.5,
         },
         label: { show: topIds.has(f.id) || sel },
       };
     });
+    const qTxt = (n, imp, mon) => yKey === 'historico'
+      ? `Importancia ${imp}, histórico ${mon === 'alta' ? 'alto' : 'bajo'}`
+      : `${n} · Importancia ${imp}, deuda ${mon}`;
     const qLabel = (txt, pos) => ({ name: txt, label: { show: true, position: pos, color: TT.muted, fontSize: 11, fontFamily: 'Inter', fontWeight: 600, distance: 8 } });
     return {
       backgroundColor: 'transparent',
@@ -209,10 +212,10 @@
           markArea: {
             silent: true, itemStyle: { color: TT.quadFill },
             data: [
-              [{ ...qLabel('Alta importancia · Alto monto', 'insideTopRight'), coord: [divX, avgY] }, { coord: [xMax, 'max'] }],
-              [{ ...qLabel('Baja importancia · Alto monto', 'insideTopLeft'), coord: [xMin, avgY], itemStyle: { color: 'transparent' } }, { coord: [divX, 'max'] }],
-              [{ ...qLabel('Alta importancia · Bajo monto', 'insideBottomRight'), coord: [divX, 0], itemStyle: { color: 'transparent' } }, { coord: [xMax, avgY] }],
-              [{ ...qLabel('Baja importancia · Bajo monto', 'insideBottomLeft'), coord: [xMin, 0] }, { coord: [divX, avgY] }],
+              [{ ...qLabel(qTxt(1, 'alta', 'alta'), 'insideTopRight'), coord: [divX, avgY] }, { coord: [xMax, 'max'] }],
+              [{ ...qLabel(qTxt(3, 'baja', 'alta'), 'insideTopLeft'), coord: [xMin, avgY], itemStyle: { color: 'transparent' } }, { coord: [divX, 'max'] }],
+              [{ ...qLabel(qTxt(2, 'alta', 'baja'), 'insideBottomRight'), coord: [divX, 0], itemStyle: { color: 'transparent' } }, { coord: [xMax, avgY] }],
+              [{ ...qLabel(qTxt(4, 'baja', 'baja'), 'insideBottomLeft'), coord: [xMin, 0] }, { coord: [divX, avgY] }],
             ],
           },
           markLine: {
@@ -226,7 +229,16 @@
           },
         },
         {
-          id: 'main', type: 'scatter', data,
+          // anillo de selección (igual para todos los colores)
+          id: 'halo', type: 'scatter', silent: true, z: 1, animation: false,
+          data: data.filter(d => state.sel.has(d.id)).map(d => ({
+            value: d.value, symbolSize: d.symbolSize + 12,
+            itemStyle: { color: 'transparent', borderColor: TT.ring, borderWidth: 3 },
+          })),
+          tooltip: { show: false },
+        },
+        {
+          id: 'main', type: 'scatter', data, z: 2,
           universalTransition: { enabled: true },
           label: {
             position: 'top', distance: 4, color: TT.text, fontSize: 11, fontWeight: 600, fontFamily: 'Inter',
@@ -254,8 +266,8 @@
       return {
         id: f.id, name: f.empresa, f, value: f[key] ?? 0,
         itemStyle: {
-          color: TT.tipo[f.tipo], opacity: state.sel.size && !sel && !opts.exporting ? 0.45 : 1,
-          borderRadius: [0, 4, 4, 0], borderColor: sel ? TT.ring : 'transparent', borderWidth: sel ? 2 : 0,
+          color: TT.tipo[f.tipo], opacity: state.sel.size && !sel && !opts.exporting ? 0.3 : 1,
+          borderRadius: [0, 4, 4, 0], borderColor: sel ? TT.ring : 'transparent', borderWidth: sel ? 2.5 : 0,
         },
       };
     });
@@ -274,7 +286,11 @@
       yAxis: {
         type: 'category', inverse: true, data: list.map(f => f.empresa),
         ...axisCommon(TT), axisLine: { show: false }, splitLine: { show: false },
-        axisLabel: { ...axisCommon(TT).axisLabel, color: TT.text, formatter: v => C.shortName(v, 30), width: 220 },
+        axisLabel: {
+          ...axisCommon(TT).axisLabel, color: TT.text, width: 240,
+          formatter: (v, i) => list[i] && state.sel.has(list[i].id) ? `{sel|● ${C.shortName(v, 28)}}` : C.shortName(v, 30),
+          rich: { sel: { color: TT.ring, fontWeight: 700, fontSize: 12, fontFamily: 'Inter', backgroundColor: TT.name === 'dark' ? 'rgba(255,216,77,.18)' : 'rgba(255,216,77,.45)', padding: [2, 6], borderRadius: 4 } },
+        },
       },
       dataZoom: many ? [
         { type: 'slider', yAxisIndex: 0, right: 8, width: 14, startValue: 0, endValue: 21, zoomLock: false, showDetail: false, brushSelect: false,
@@ -340,6 +356,7 @@
     C.countUp($('#kProv'), s.prov, money);
     $('#kProvSub').textContent = `${s.nProv} empresas${s.nAmbos ? ` · incluye ${moneyShort(s.ambos)} de “ambos”` : ''}`;
     $('#kTop5').textContent = pct(s.top5Pct);
+    $('#kTop5').title = `Las 5 empresas con mayor deuda suman ${money(s.top5)} de ${money(s.total)}`;
     $('#kAvg').textContent = moneyShort(s.promedio);
     $('#kMax').textContent = s.mayor ? s.mayor.empresa : '—';
     $('#kMax').title = s.mayor ? `${s.mayor.empresa} · ${money(s.mayor.deuda)}` : '';
@@ -383,6 +400,8 @@
   }
 
   function renderQuad() {
+    const d = state.data;
+    $('#quadHint').innerHTML = `Importancia <b>alta</b> = mayor que ${d.divisoriaX} · Deuda <b>alta</b> = igual o mayor al promedio (${moneyShort(d.promDeuda)})`;
     const vals = [1, 2, 3, 4].map(q => {
       const l = state.list.filter(f => f.cuadrante === q);
       return { q, v: l.reduce((a, f) => a + f.deuda, 0), n: l.length };
@@ -393,7 +412,7 @@
       tooltip: { ...C.tooltipBase(T), trigger: 'item', formatter: p => `<div class="tt"><div class="tt-name">${CUADRANTES[p.data.q].label}</div><table><tr><td>Deuda</td><td><b>${money(p.data.value)}</b></td></tr><tr><td>Empresas</td><td>${p.data.n}</td></tr><tr class="tt-hint"><td colspan="2">Clic para filtrar este cuadrante</td></tr></table></div>` },
       xAxis: { type: 'value', show: false, max: v => v.max * 1.02 || 1 },
       yAxis: { type: 'category', inverse: true, data: vals.map(v => v.q), axisLine: { show: false }, axisTick: { show: false },
-        axisLabel: { color: T.text2, fontFamily: 'Inter', fontSize: 11, formatter: q => `${q} · ${CUADRANTES[q].short}` } },
+        axisLabel: { color: T.text2, fontFamily: 'Inter', fontSize: 11.5, formatter: q => `${q} · ${CUADRANTES[q].short}` } },
       series: [{
         type: 'bar', barWidth: 12,
         data: vals.map(v => ({ value: v.v, q: v.q, n: v.n, itemStyle: { color: state.f.quad && state.f.quad !== v.q ? 'rgba(29,32,65,.12)' : ['#1D2041', '#454A7A', '#7C81A8', '#B3B7D0'][v.q - 1], borderRadius: [0, 4, 4, 0] } })),
@@ -416,6 +435,33 @@
         Sumar las dos categorías daría <b>${money(suma)}</b>; la deuda real es <b>${money(s.total)}</b>. <span class="nowrap">No sumar dos veces ${money(s.ambos)}.</span></p>
         <div class="chips">${s.ambosList.map(f => `<button class="chip ${state.sel.has(f.id) ? 'on' : ''}" data-id="${f.id}" title="Clic para seleccionar"><i style="background:${T.tipo[TIPOS.AMBOS]}"></i>${esc(f.empresa)} <b>${moneyShort(f.deuda)}</b></button>`).join('')}</div>
       </div>`;
+  }
+
+  function renderCriteria() {
+    const d = state.data, n = d.filas.length;
+    const card = (icon, title, highTxt, lowTxt, note) => `
+      <div class="crit">
+        <div class="crit-icon">${icon}</div>
+        <div class="crit-body">
+          <span class="crit-title">${title}</span>
+          <div class="crit-rows">
+            <span class="crit-tag hi">Alto</span><b>${highTxt}</b>
+            <span class="crit-tag lo">Bajo</span><b>${lowTxt}</b>
+          </div>
+          <span class="crit-note">${note}</span>
+        </div>
+      </div>`;
+    const ico = {
+      deuda: '<svg viewBox="0 0 24 24"><path d="M3 6h18v12H3zM3 10h18M7 15h3"/></svg>',
+      hist: '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v4h4M12 7v5l3 2"/></svg>',
+      imp: '<svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.8 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/></svg>',
+    };
+    const divX = d.divisoriaX;
+    $('#criteria').innerHTML =
+      `<div class="crit-head"><h2>¿Desde cuánto es alto o bajo?</h2><span class="hint">Valores en dólares (${C.CFG.moneda || 'USD'}) · calculados sobre las ${n} empresas del archivo · no cambian con los filtros</span></div>` +
+      card(ico.deuda, 'Deuda vigente', `desde ${money(d.promDeuda)}`, `menos de ${money(d.promDeuda)}`, 'Divisoria = promedio de la deuda. Define los cuadrantes 1 a 4.') +
+      (d.tieneHistorico ? card(ico.hist, 'Histórico pagado', `desde ${money(d.promHist)}`, `menos de ${money(d.promHist)}`, 'Divisoria = promedio del histórico. Se usa con «Eje Y: Histórico pagado».') : '') +
+      card(ico.imp, 'Importancia operativa', `mayor que ${divX}`, `${divX} o menos`, `Divisoria tomada de la celda B2 del Excel.`);
   }
 
   function renderDQ() {
@@ -463,6 +509,11 @@
     on ? state.sel.add(id) : state.sel.delete(id);
   }
   function refreshSelection() {
+    // Quitar cualquier resaltado/atenuado del ratón ANTES de redibujar: si no,
+    // la fila sobre la que estaba el cursor (la recién marcada) quedaba atenuada.
+    main.dispatchAction({ type: 'downplay', seriesId: 'main' });
+    main.dispatchAction({ type: 'hideTip' });
+    hoverRow = null;
     main.setOption(buildMain(T), { replaceMerge: ['series'] });
     renderTable(); renderSelection(); renderOverlap(state.summary);
   }
