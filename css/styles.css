@@ -333,3 +333,52 @@ select option { background: #FFFFFF; color: var(--text); }
 .lg-size-t { margin-right: 2px; }
 .lg-bub { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--text-2); font-weight: 600; }
 .lg-bub i { display: inline-block; border-radius: 50%; border: 1.5px solid var(--muted); background: rgba(118, 123, 159, .12); flex: none; }
+
+/* ---------- Logo como enlace a la matriz ---------- */
+.brand-home { display: block; border-radius: 10px; transition: opacity .2s, transform .2s; }
+.brand-home:hover { opacity: .85; }
+.brand-home:active { transform: scale(.98); }
+.brand-home:focus-visible { outline: 2px solid var(--yellow); outline-offset: 4px; }
+
+/* ---------- Pantalla de contraseña ---------- */
+.app { transition: filter .55s ease; }
+.app.locked { filter: blur(16px) saturate(.9); pointer-events: none; user-select: none; }
+body.gate-open { overflow: hidden; }
+.gate {
+  position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 16px;
+  background: rgba(29, 32, 65, .38); transition: opacity .5s ease;
+}
+.gate.out { opacity: 0; pointer-events: none; }
+.gate.out .gate-card { transform: translateY(-10px) scale(.98); }
+.gate-card {
+  width: min(420px, 100%); background: var(--surface); border-radius: 18px; overflow: hidden;
+  box-shadow: 0 30px 80px rgba(29, 32, 65, .35); transition: transform .5s ease; animation: gateIn .45s ease-out;
+}
+.gate-brand { background: var(--navy); padding: 22px 28px; display: flex; justify-content: center; border-bottom: 3px solid var(--yellow); }
+.gate-brand img { height: 64px; width: auto; }
+.gate-body { padding: 24px 28px 28px; display: flex; flex-direction: column; }
+.gate-lock { width: 40px; height: 40px; border-radius: 12px; background: rgba(255, 216, 77, .3); color: var(--navy); display: grid; place-items: center; margin-bottom: 12px; }
+.gate-lock svg { width: 20px; height: 20px; }
+.gate-body h2 { font-family: var(--font-head); font-size: 20px; margin: 0 0 6px; }
+.gate-body p { margin: 0 0 18px; color: var(--text-2); font-size: 13.5px; }
+.gate-label { font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
+.gate-input { position: relative; }
+.gate-input input {
+  width: 100%; height: 44px; padding: 0 46px 0 14px; border-radius: 11px; border: 1px solid var(--border-2);
+  background: var(--surface-2); font-size: 15px; outline: none; transition: border-color .2s, box-shadow .2s;
+}
+.gate-input input:focus { border-color: var(--prov); box-shadow: 0 0 0 3px var(--yellow-soft); background: #fff; }
+.gate-input button { position: absolute; right: 6px; top: 6px; width: 32px; height: 32px; border: 0; border-radius: 8px; background: none; cursor: pointer; color: var(--muted); display: grid; place-items: center; }
+.gate-input button:hover { background: var(--surface-3); color: var(--text); }
+.gate-err { min-height: 20px; margin: 8px 0 6px !important; color: var(--ambos) !important; font-size: 12.5px !important; font-weight: 600; }
+.gate-btn { height: 44px; justify-content: center; font-size: 14px; }
+.gate-card.bad { animation: shake .4s; }
+@keyframes gateIn { from { opacity: 0; transform: translateY(12px) scale(.98); } }
+@keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+
+/* ---------- Ficha (tooltip): que nunca se corte ---------- */
+.tt { width: 100%; max-width: none; box-sizing: border-box; }
+.tt table { table-layout: auto; }
+.tt td { vertical-align: top; line-height: 1.35; }
+.tt td:first-child { white-space: nowrap; }
+.tt td:last-child { white-space: normal; padding-left: 12px; }

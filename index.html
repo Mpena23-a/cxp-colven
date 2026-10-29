@@ -10,11 +10,36 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/compare.css">
 </head>
 <body>
+  <!-- ===================== ACCESO CON CONTRASEÑA ===================== -->
+  <div id="gate" class="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
+    <form class="gate-card" id="gateForm" autocomplete="off">
+      <div class="gate-brand"><img src="assets/logo-colven.png" alt="Colven Business Corp."></div>
+      <div class="gate-body">
+        <div class="gate-lock"><svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+        <h2 id="gateTitle">Acceso restringido</h2>
+        <p>Este panel contiene información financiera de Colven Business &amp; Corp. Ingresa la contraseña para continuar.</p>
+        <label for="gatePass" class="gate-label">Contraseña</label>
+        <div class="gate-input">
+          <input type="password" id="gatePass" autocomplete="current-password" spellcheck="false" required>
+          <button type="button" id="gateEye" aria-label="Mostrar contraseña" title="Mostrar contraseña">
+            <svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <p class="gate-err" id="gateErr" role="alert"></p>
+        <button class="btn btn-primary gate-btn" type="submit">Ingresar</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="app" class="app locked" inert>
   <header class="topbar">
     <div class="brand">
-      <img src="assets/logo-colven.png" alt="Colven Business Corp." class="brand-logo">
+      <a href="#" id="homeLink" class="brand-home" title="Volver a la matriz" aria-label="Volver a la matriz principal">
+        <img src="assets/logo-colven.png" alt="Colven Business Corp." class="brand-logo">
+      </a>
       <div class="brand-sep"></div>
       <div>
         <h1>Cuentas por pagar<span id="ribbon" class="ribbon" hidden>Prototipo · cifras de ejemplo</span></h1>
@@ -35,6 +60,8 @@
     </div>
   </header>
 
+  <!-- ===================== VISTA 1: PANEL PRINCIPAL ===================== -->
+  <div id="viewPanel">
   <!-- ===================== FILTROS ===================== -->
   <section class="filters" aria-label="Filtros">
     <div class="f-group f-search">
@@ -113,6 +140,10 @@
             <button data-v="ranking" title="Ranking de barras">
               <svg viewBox="0 0 24 24"><path d="M4 6h14M4 12h10M4 18h6"/></svg>Ranking</button>
           </div>
+          <div class="seg seg-sm" id="vScale" title="Escala del eje vertical">
+            <button data-v="log" class="on" title="Cada línea multiplica el monto por 10: permite ver juntos montos pequeños y grandes">Escala logarítmica</button>
+            <button data-v="lin" title="Distancias proporcionales al monto">Escala lineal</button>
+          </div>
           <div class="menu">
             <button class="btn btn-ghost btn-sm" id="btnExport" aria-haspopup="true">
               <svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4-4m4 4 4-4M4 20h16"/></svg>Imagen</button>
@@ -186,7 +217,7 @@
       <div class="card-head">
         <div>
           <h2>Detalle</h2>
-          <p class="hint">Marca las casillas para analizar empresas en otra ventana</p>
+          <p class="hint">Marca las casillas y pulsa «Analizar selección» para ver otros gráficos de esas empresas</p>
         </div>
         <div class="head-tools">
           <button class="btn btn-ghost btn-sm" id="btnCsv">
@@ -214,11 +245,100 @@
 
     <section class="dq" id="dq" hidden></section>
   </main>
+  </div>
+
+  <!-- ===================== VISTA 2: ANÁLISIS DE LA SELECCIÓN ===================== -->
+  <div id="viewAnalisis" hidden>
+    <section class="filters">
+      <button class="btn btn-ghost btn-sm" id="aBack">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>Volver a la matriz</button>
+      <div class="f-group">
+        <span class="f-label">Parámetro</span>
+        <div class="seg" id="aMetric">
+          <button data-v="deuda" class="on">Deuda</button>
+          <button data-v="historico">Histórico pagado</button>
+          <button data-v="importancia">Importancia</button>
+          <button data-v="vs">Deuda vs. histórico</button>
+        </div>
+      </div>
+      <div class="f-group">
+        <span class="f-label">Gráfico</span>
+        <div class="seg" id="aType">
+          <button data-v="barras" class="on">Barras</button>
+          <button data-v="dona">Dona</button>
+          <button data-v="rosa">Rosa</button>
+          <button data-v="treemap">Mapa de árbol</button>
+          <button data-v="embudo">Embudo</button>
+          <button data-v="radar">Radar</button>
+        </div>
+      </div>
+    </section>
+
+    <main class="layout">
+      <section class="card chart-card">
+        <div class="card-head">
+          <div>
+            <h2 id="aTitle">Análisis de la selección</h2>
+            <p class="hint" id="aHint"></p>
+          </div>
+          <div class="head-tools">
+            <div class="menu">
+              <button class="btn btn-ghost btn-sm" id="aBtnExport" aria-haspopup="true">
+                <svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4-4m4 4 4-4M4 20h16"/></svg>Imagen</button>
+              <div class="menu-list" id="aExportMenu" hidden>
+                <button data-e="dark">PNG · fondo Colven (con resumen)</button>
+                <button data-e="light">PNG · fondo blanco (para informes)</button>
+                <button data-e="transparent">PNG · solo gráfico, transparente</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="aChart" class="chart chart-analisis"></div>
+      </section>
+
+      <aside class="summary summary-analisis" aria-label="Resumen de la selección">
+        <div class="summary-head"><h2>Resumen de la selección</h2></div>
+        <div class="kpis">
+          <div class="kpi">
+            <span class="kpi-label">Empresas seleccionadas</span>
+            <span class="kpi-value" id="aN">0</span>
+            <span class="kpi-sub" id="aNsub"></span>
+          </div>
+          <div class="kpi kpi-hero">
+            <span class="kpi-label">Total deuda</span>
+            <span class="kpi-value" id="aTotal">$0</span>
+            <span class="kpi-sub" id="aTotalSub"></span>
+          </div>
+          <div class="kpi" data-t="Prestador de servicios">
+            <span class="kpi-label"><i class="dot" data-t="Prestador de servicios"></i>Total prestadores de servicios</span>
+            <span class="kpi-value" id="aServ">$0</span>
+            <span class="kpi-sub" id="aServSub"></span>
+          </div>
+          <div class="kpi" data-t="Proveedor">
+            <span class="kpi-label"><i class="dot" data-t="Proveedor"></i>Total proveedores</span>
+            <span class="kpi-value" id="aProv">$0</span>
+            <span class="kpi-sub" id="aProvSub"></span>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-head"><h3>Empresas en el análisis</h3><span class="hint" id="aSelHint"></span></div>
+          <div class="add-row">
+            <input list="aAllNames" id="aAddInput" placeholder="Agregar empresa…" autocomplete="off">
+            <datalist id="aAllNames"></datalist>
+          </div>
+          <div class="sel-list" id="aSelList"></div>
+        </div>
+      </aside>
+
+      <section class="notice" id="aOverlap" hidden></section>
+    </main>
+  </div>
 
   <footer class="foot">
     <span>Colven Business &amp; Corp. · Dirección de Finanzas</span>
     <span id="footSrc"></span>
   </footer>
+  </div><!-- /#app -->
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -227,6 +347,8 @@
   <script src="js/config.js"></script>
   <script src="js/data-fallback.js"></script>
   <script src="js/common.js"></script>
+  <script src="js/gate.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/analisis.js"></script>
 </body>
 </html>

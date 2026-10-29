@@ -1,4 +1,4 @@
-/* Ventana de análisis de selección */
+/* Vista de análisis de la selección (dentro de index.html) */
 .seg button.dis { opacity: .3; pointer-events: none; }
 .add-row input {
   width: 100%; height: 36px; padding: 0 12px; border-radius: 10px; background: var(--surface-2);
@@ -19,6 +19,9 @@
 .sel-item button:hover { background: rgba(232, 96, 122, .2); color: var(--ambos); }
 .sel-item button svg { width: 14px; height: 14px; }
 .empty-state { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; }
-.summary .block { grid-column: 1 / -1; }
+.summary-analisis .block { grid-column: 1 / -1; }
 .sel-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 6px; max-height: 360px; }
 .add-row input { max-width: 420px; }
+
+#viewAnalisis .filters { position: static; }
+.chart.chart-analisis { height: clamp(340px, 52vh, 540px); }

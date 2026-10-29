@@ -101,7 +101,9 @@
     row.forEach((h, i) => {
       const s = norm(h);
       if (!s) return;
-      if (m.empresa == null && /^(empresa|proveedor|razon social|nombre|contratista)/.test(s)) m.empresa = i;
+      // «PROVEEDOR SUMINISTRO O SERVICIOS» = columna de tipo (se revisa antes que el nombre)
+      if (m.tipo == null && /(suministro|servicio)/.test(s) && !/^(us|usd|\$)/.test(s)) m.tipo = i;
+      else if (m.empresa == null && /^(empresa|proveedor|razon social|nombre|contratista)/.test(s)) m.empresa = i;
       else if (m.historico == null && /(historic|pagado|pagos)/.test(s)) m.historico = i;
       else if (m.importancia == null && /(importancia|relacion|pozo|peso)/.test(s)) m.importancia = i;
       else if (m.tipo == null && /^(tipo|categoria|clasificacion|figura)/.test(s)) m.tipo = i;
@@ -131,7 +133,7 @@
     for (let i = hIdx + 1; i < aoa.length; i++) {
       const r = aoa[i] || [];
       const empresa = String(r[map.empresa] ?? '').replace(/\s+/g, ' ').trim();
-      if (!empresa || /^total/i.test(empresa)) continue;
+      if (!empresa || /^total/i.test(empresa) || /^\(?en blanco\)?$/i.test(empresa)) continue;
       const deuda = map.deuda != null ? parseNumber(r[map.deuda]) : NaN;
       const imp = map.importancia != null ? parseNumber(r[map.importancia]) : NaN;
       filas.push({
@@ -147,26 +149,44 @@
 
   function parseWorkbook(buf) {
     const wb = XLSX.read(buf, { type: 'array' });
-    const name = wb.SheetNames.find(n => /empresa/i.test(n)) || wb.SheetNames[0];
-    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null });
-    return parseRows(aoa);
+    // Prioridad: hoja «POR PROVEEDOR», luego «Empresas», luego cualquier hoja legible
+    const order = [
+      ...wb.SheetNames.filter(n => /por\s*proveedor/i.test(n)),
+      ...wb.SheetNames.filter(n => /empresa/i.test(n)),
+      ...wb.SheetNames,
+    ];
+    let lastErr;
+    for (const name of [...new Set(order)]) {
+      try {
+        const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: null });
+        const res = parseRows(aoa);
+        if (res.filas.length) { res.hoja = name.trim(); return res; }
+      } catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error('El Excel no tiene filas de proveedores.');
   }
 
   /** Normaliza filas y calcula campos derivados. */
   function prepare(raw, fuente) {
+    const negativos = [];
     const filas = raw.filas.map((f, i) => ({
       id: 'p' + (i + 1),
       n: i + 1,
       empresa: f.empresa,
       importancia: f.importancia,
-      deuda: +f.deuda || 0,
+      deuda: Math.max(0, +f.deuda || 0),
+      deudaOriginal: +f.deuda || 0,
       historico: isNaN(+f.historico) || f.historico == null ? null : +f.historico,
       tipo: normTipo(f.tipo),
     }));
+    filas.forEach(f => { if (f.deudaOriginal < -0.5) negativos.push(f); });
+    const sinImportancia = filas.filter(f => f.importancia == null || isNaN(f.importancia));
+    sinImportancia.forEach(f => { f.importancia = null; });
     const imps = filas.map(f => f.importancia).filter(v => v != null);
+    if (!imps.length) imps.push(1, 10);
     const minImp = Math.min(...imps), maxImp = Math.max(...imps);
     let divisoriaX = raw.divisoriaX;
-    if (divisoriaX == null) divisoriaX = minImp < 0 ? 0 : 5;
+    if (divisoriaX == null) divisoriaX = CFG.divisoriaImportancia ?? (minImp < 0 ? 0 : 5);
     const promDeuda = filas.reduce((s, f) => s + f.deuda, 0) / (filas.length || 1);
     const conHist = filas.filter(f => f.historico != null);
     const promHist = conHist.reduce((s, f) => s + f.historico, 0) / (conHist.length || 1);
@@ -187,20 +207,27 @@
     filas.forEach(f => { (groups[key(f.empresa)] = groups[key(f.empresa)] || []).push(f.empresa); });
     const duplicados = Object.values(groups).filter(g => g.length > 1);
     return {
-      filas, divisoriaX, promDeuda, promHist, promY, ejeY, minImp, maxImp, duplicados,
+      filas, divisoriaX, promDeuda, promHist, promY, ejeY, minImp, maxImp, duplicados, negativos, sinImportancia, hoja: raw.hoja || '',
       tieneHistorico,
       fuente: fuente || '',
     };
   }
 
   async function loadData() {
-    const url = (CFG.archivoExcel || 'data/Matriz_Contratistas.xlsx');
+    // Se prueba el archivo de config.js y, si no está, los nombres conocidos.
+    const urls = [...new Set([].concat(CFG.archivoExcel || [], 'data/SALDOS PEND X PAG PROVEE.xlsx', 'data/Matriz_Contratistas.xlsx'))];
     try {
       if (location.protocol === 'file:') throw new Error('file');
-      const res = await fetch(url + '?v=' + Date.now(), { cache: 'no-store' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const buf = await res.arrayBuffer();
-      return prepare(parseWorkbook(buf), url.split('/').pop());
+      let lastErr;
+      for (const url of urls) {
+        try {
+          const res = await fetch(encodeURI(url) + '?v=' + Date.now(), { cache: 'no-store' });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const buf = await res.arrayBuffer();
+          return prepare(parseWorkbook(buf), url.split('/').pop());
+        } catch (err) { lastErr = err; }
+      }
+      throw lastErr;
     } catch (e) {
       if (window.COLVEN_DATA_FALLBACK) {
         const d = window.COLVEN_DATA_FALLBACK;
@@ -260,6 +287,8 @@
   let logoImg = null;
   function getLogo() {
     if (logoImg) return Promise.resolve(logoImg);
+    // Abierto con doble clic (file://): el navegador no deja exportar con imágenes locales
+    if (location.protocol === 'file:') return Promise.resolve(null);
     return new Promise(res => {
       const im = new Image();
       im.onload = () => { logoImg = im; res(im); };
@@ -357,7 +386,7 @@
   function tooltipBase(T) {
     return {
       backgroundColor: T.tooltipBg, borderColor: T.name === 'dark' ? 'rgba(255,216,77,.35)' : 'rgba(29,32,65,.15)', borderWidth: 1,
-      padding: 0, extraCssText: 'border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.35);',
+      padding: 0, extraCssText: 'border-radius:12px;box-shadow:0 12px 32px rgba(29,32,65,.22);white-space:normal;width:370px;max-width:calc(100vw - 32px);overflow:visible;',
       textStyle: { color: T.text, fontFamily: 'Inter, sans-serif' },
       transitionDuration: 0.2, confine: true,
     };

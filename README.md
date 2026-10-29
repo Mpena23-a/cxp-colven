@@ -4,25 +4,30 @@ Panel interactivo de la deuda con proveedores y prestadores de servicios de **Co
 
 ## Qué incluye
 
-- **Matriz de burbujas única**: eje X = importancia operativa, eje Y = histórico pagado, tamaño de la burbuja = deuda vigente (metodología de la minuta del 26-10-2026). También hay una vista de **ranking de barras**, con transición animada entre ambas.
-- Cuadrantes: importancia alta (> celda B2) o baja × histórico alto (≥ promedio) o bajo.
-- **Filtros**: nombre, tipo (proveedor / prestador / ambos), cuadrante, rango de importancia, orden (deuda, importancia, histórico, nombre) y Top N.
-- **Resumen** que cambia con los filtros: cantidad de empresas, total deuda, total prestadores, total proveedores, composición, deuda por cuadrante y concentración.
-- **Aviso de doble categoría**: lista las empresas que son proveedor y prestador a la vez, con su monto, para que esa deuda no se sume dos veces. El total nunca la duplica.
-- **Ventana de análisis** (`compare.html`): con las empresas seleccionadas genera barras, dona, rosa, mapa de árbol, embudo y radar según el parámetro elegido.
-- **Imágenes PNG** de cada gráfico: fondo Colven con resumen, fondo blanco para informes, o solo el gráfico con fondo transparente.
-- Exportación CSV de la tabla filtrada.
+- **Acceso con contraseña**: al abrir el enlace aparece una ventana de contraseña y el panel queda difuminado hasta escribirla. Se pide una vez por pestaña del navegador.
+- **Matriz de burbujas única**: eje X = importancia operativa (1 a 10, definida en mesa de trabajo entre Operaciones, Tesorería (Dir. Finanzas) y Procura), eje Y = histórico pagado (US $ PAGADO), tamaño de la burbuja = deuda vigente (US$ POR PAGAR). Escala vertical logarítmica (por defecto) o lineal. También hay una vista de **ranking de barras**.
+- Cuadrantes: importancia alta (> 5) o baja × histórico alto (≥ promedio) o bajo. El cuadro «¿Desde cuándo se considera alto o bajo?» muestra los montos en USD.
+- **Filtros**: nombre, tipo (proveedor / prestador / ambos), cuadrante, rango de importancia, orden y Top N.
+- **Resumen** que cambia con los filtros, **aviso de doble categoría** (empresas que son proveedor y prestador, sin duplicar su deuda en el total) y sección de **calidad de datos**.
+- **Análisis de la selección** dentro de la misma página: barras, dona, rosa, mapa de árbol, embudo y radar. Se vuelve a la matriz con el botón «Volver a la matriz», con el logo o con el botón Atrás del navegador.
+- **Imágenes PNG** de cada gráfico y exportación CSV de la tabla.
 
 ## Actualizar los datos
 
-1. Reemplaza `data/Matriz_Contratistas.xlsx` por el archivo real (hoja **Empresas**, encabezados en la fila 3).
-2. Columnas que se leen (el orden no importa): `Empresa`, `Importancia operativa`, `Monto ($)` (deuda vigente), `Tipo` (Proveedor / Prestador de servicios / Ambos) y, opcional, `Histórico pagado ($)`.
-3. En `js/config.js` cambia `datosDeEjemplo: false` y, si quieres, fija `fechaCorte` (p. ej. `'15 de noviembre de 2026'`).
-4. Sube los cambios a GitHub. La página se actualiza sola.
+1. El dashboard lee `data/SALDOS PEND X PAG PROVEE.xlsx`, hoja **POR PROVEEDOR** (encabezados en la fila donde dice PROVEEDOR).
+2. Columnas que se leen (el orden no importa): `PROVEEDOR`, `US $ PAGADO` (histórico), `US$ POR PAGAR` (deuda), `IMPORTANCIA OPERATIVA` y `PROVEEDOR SUMINISTRO O SERVICIOS` (SUMINISTRO = proveedor, SERVICIOS = prestador, SUMINISTRO-SERVICIOS = ambos). La columna TOTAL y la fila TOTAL se ignoran.
+3. Para actualizar, sube a la carpeta `data/` el Excel nuevo **con el mismo nombre** (reemplaza al anterior) y haz «Commit changes».
+4. Cuando las cifras sean definitivas, en `js/config.js` cambia `datosDeEjemplo: false`.
 
-> El botón **Cargar Excel** del panel permite previsualizar otro archivo solo en tu navegador, sin modificar el repositorio.
+> Saldos por pagar negativos (p. ej. TOP DRIVE) se muestran como deuda $0 y se listan en «Calidad de datos». Las empresas sin importancia operativa no aparecen en la matriz, pero sí en el ranking, la tabla y los totales.
 
-`js/data-fallback.js` contiene una copia de los datos de ejemplo que se usa al abrir `index.html` directamente desde el disco (sin servidor). En GitHub Pages siempre se lee el Excel.
+`js/data-fallback.js` contiene una copia de los datos que se usa al abrir `index.html` con doble clic (sin servidor). En GitHub Pages siempre se lee el Excel.
+
+## Contraseña
+
+- La contraseña no está escrita en el código: `js/gate.js` guarda solo su huella SHA-256 (`HUELLA`).
+- Para cambiarla: calcula el SHA-256 de la nueva contraseña (por ejemplo en https://emn178.github.io/online-tools/sha256.html), pega el resultado en `HUELLA` dentro de `js/gate.js` y sube el archivo.
+- **Límite importante**: es una barrera visual. Quien conozca la dirección del Excel dentro del repositorio público podría descargarlo directamente. Para proteger cifras sensibles de verdad hace falta cifrar el archivo o usar un hosting privado.
 
 ## Publicar en GitHub Pages
 
@@ -36,12 +41,13 @@ Panel interactivo de la deuda con proveedores y prestadores de servicios de **Co
 
 ```
 index.html            Panel principal
-compare.html          Ventana de análisis de la selección
+compare.html          Redirige a index.html (el análisis ahora está en la misma página)
 css/                  Estilos (marca Colven)
 js/config.js          Configuración editable
 js/common.js          Lectura del Excel, cálculos y exportación de imágenes
 js/app.js             Lógica del panel principal
-js/compare.js         Lógica de la ventana de análisis
+js/analisis.js        Vista de análisis de la selección
+js/gate.js            Pantalla de contraseña
 js/data-fallback.js   Datos de respaldo (ejemplo)
 data/                 Excel de origen
 assets/               Logo e ícono

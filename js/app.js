@@ -13,6 +13,7 @@
     data: null,
     f: { ...DEFAULT_F },
     view: 'matriz',
+    yScale: 'log',
     sel: new Set(),
     tableSort: null,
     list: [],
@@ -28,7 +29,11 @@
     $$('.dot[data-t]').forEach(d => d.style.background = T.tipo[d.dataset.t]);
     main = echarts.init($('#mainChart'), null, { renderer: 'canvas' });
     quad = echarts.init($('#quadChart'), null, { renderer: 'canvas' });
-    let rz; new ResizeObserver(() => { main.resize(); quad.resize(); clearTimeout(rz); rz = setTimeout(() => state.data && main.setOption(buildMain(T), { replaceMerge: ['series'] }), 200); }).observe(document.body);
+    let rz; new ResizeObserver(() => {
+      if (state.route === 'analisis') { window.COLVEN_ANALISIS && window.COLVEN_ANALISIS.resize(); return; }
+      main.resize(); quad.resize(); clearTimeout(rz);
+      rz = setTimeout(() => state.data && main.setOption(buildMain(T), { replaceMerge: ['series'] }), 200);
+    }).observe(document.body);
     bindUI();
     try {
       setData(await C.loadData());
@@ -49,10 +54,12 @@
     $('#fImpMin').value = state.f.impMin; $('#fImpMax').value = state.f.impMax;
     $('#fSort option[value="historico"]').disabled = !d.tieneHistorico;
     $('#source').textContent = d.fuente;
-    $('#footSrc').textContent = `${d.filas.length} empresas · fuente: ${d.fuente}`;
+    $('#footSrc').textContent = `${d.filas.length} empresas · fuente: ${d.fuente}${d.hoja ? ` (hoja «${d.hoja}»)` : ''}`;
     renderDQ();
     renderCriteria();
     update(true);
+    if (location.hash === '#analisis') history.replaceState(null, '', location.pathname + location.search);
+    route();
   }
 
   /* ---------------- Filtrado ---------------- */
@@ -98,7 +105,7 @@
   }
 
   /* ---------------- Gráfico principal ---------------- */
-  const GRID = { left: 78, right: 34, top: 30, bottom: 58 };
+  const GRID = { left: 78, right: 34, top: 46, bottom: 58 };
   function bubbleSize(v, W) {
     const max = state.data.maxDeudaAll || 1;
     const k = Math.max(0.5, Math.min(1, (W || 1200) / 1200));
@@ -108,9 +115,9 @@
    * Distribuye horizontalmente las burbujas que comparten la misma importancia
    * para que no se monten (tipo "beeswarm"), sin salirse de su columna.
    */
-  function dodge(list, yKey, xMin, xMax, yMax, W, H) {
+  function dodge(list, yKey, xMin, xMax, yToPx, W, H) {
     const pw = W - GRID.left - GRID.right, ph = H - GRID.top - GRID.bottom;
-    const ppx = pw / (xMax - xMin), ppy = ph / (yMax || 1);
+    const ppx = pw / (xMax - xMin);
     const out = {}, cols = {};
     list.forEach(f => { const k = f.importancia ?? 'x'; (cols[k] = cols[k] || []).push(f); });
     Object.values(cols).forEach(col => {
@@ -118,7 +125,7 @@
       const placed = [];
       col.forEach(f => {
         const r = bubbleSize(f.deuda, W) / 2;
-        const y = (yKey === 'historico' ? (f.historico ?? 0) : f.deuda) * ppy;
+        const y = yToPx(yKey === 'historico' ? (f.historico ?? 0) : f.deuda) * ph;
         const lim = Math.max(0, ppx * 0.44 - r * 0.5);
         let best = 0, bestOv = Infinity;
         const cands = [0];
@@ -159,21 +166,32 @@
     return Math.ceil(n / step) * step * p;
   }
   function buildMatrix(TT, opts) {
-    const d = state.data, list = state.list;
+    const d = state.data, list = state.list.filter(f => f.importancia != null);
     const yKey = d.ejeY;
     const avgY = d.promY;
     const divX = d.divisoriaX + (Number.isInteger(d.divisoriaX) ? 0.5 : 0);
     const xMin = Math.floor(d.minImp) - 1, xMax = Math.ceil(d.maxImp) + 1;
     const W = opts.w || (main ? main.getWidth() : 1200), H = opts.h || (main ? main.getHeight() : 700);
-    const maxY = Math.max(avgY, ...list.map(f => yKey === 'historico' ? (f.historico ?? 0) : f.deuda), 1);
-    const yMax = niceMax(maxY * 1.1);
-    const offs = dodge(list, yKey, xMin, xMax, yMax, W, H);
+    const yv = f => yKey === 'historico' ? (f.historico ?? 0) : f.deuda;
+    const maxY = Math.max(avgY, ...list.map(yv), 1);
+    // Escala vertical: logarítmica (por defecto) o lineal.
+    const isLog = state.yScale === 'log';
+    const positives = list.map(yv).filter(v => v > 0);
+    const yMin = isLog ? Math.pow(10, Math.floor(Math.log10(Math.min(avgY, ...(positives.length ? positives : [1000]))))) : 0;
+    const yMax = isLog ? Math.pow(10, Math.ceil(Math.log10(maxY * 1.15))) : niceMax(maxY * 1.1);
+    const hasFloor = isLog && list.some(f => yv(f) < yMin);
+    const yToPx = isLog
+      ? v => (Math.log10(Math.max(v, yMin)) - Math.log10(yMin)) / (Math.log10(yMax) - Math.log10(yMin))
+      : v => v / (yMax || 1);
+    const yPlot = v => isLog ? Math.max(v, yMin) : v;
+    if (!opts.exporting) state.matrixFloor = hasFloor ? yMin : 0;
+    const offs = dodge(list, yKey, xMin, xMax, yToPx, W, H);
     const topIds = new Set(list.slice().sort((a, b) => b.deuda - a.deuda).slice(0, opts.exporting ? 8 : 6).map(f => f.id));
     const data = list.map(f => {
       const sel = state.sel.has(f.id);
       return {
         id: f.id, name: f.empresa, f,
-        value: [f.importancia + (offs[f.id] || 0), yKey === 'historico' ? (f.historico ?? 0) : f.deuda, f.deuda],
+        value: [f.importancia + (offs[f.id] || 0), yPlot(yv(f)), f.deuda],
         symbolSize: bubbleSize(f.deuda, W),
         itemStyle: {
           color: TT.tipo[f.tipo], opacity: state.sel.size && !sel && !opts.exporting ? 0.3 : 1,
@@ -194,13 +212,16 @@
         formatter: p => p.data && p.data.f ? C.tooltipHTML(p.data.f, TT, rankRow(p.data.f)) : '',
       },
       xAxis: {
-        type: 'value', min: xMin, max: xMax, interval: 1, name: 'Importancia operativa →', nameLocation: 'middle', nameGap: 34,
+        type: 'value', min: xMin, max: xMax, interval: 1, name: 'Importancia operativa →', nameLocation: 'middle', nameGap: 40,
         ...axisCommon(TT), splitLine: { show: false },
-        axisLabel: { ...axisCommon(TT).axisLabel, formatter: v => (v > xMin && v < xMax) ? v : '' },
+        axisLabel: { ...axisCommon(TT).axisLabel, margin: 18, fontWeight: 600, formatter: v => (v > xMin && v < xMax) ? v : '' },
       },
       yAxis: {
-        type: 'value', name: yKey === 'historico' ? 'Histórico pagado' : 'Deuda vigente', nameLocation: 'end', nameGap: 14,
-        min: 0, max: yMax, ...axisCommon(TT), axisLabel: { ...axisCommon(TT).axisLabel, formatter: v => moneyShort(v) },
+        type: isLog ? 'log' : 'value', logBase: 10,
+        name: (yKey === 'historico' ? 'Histórico pagado' : 'Deuda vigente') + (isLog ? ' (escala logarítmica)' : ''), nameLocation: 'end', nameGap: 14,
+        min: yMin, max: yMax, ...axisCommon(TT),
+        nameTextStyle: { ...axisCommon(TT).nameTextStyle, align: 'left', padding: [0, 0, 6, -70] },
+        axisLabel: { ...axisCommon(TT).axisLabel, formatter: v => (hasFloor && v <= yMin * 1.0001) ? `$0 – ${moneyShort(v)}` : moneyShort(v) },
       },
       series: [
         {
@@ -208,10 +229,10 @@
           markArea: {
             silent: true, itemStyle: { color: TT.quadFill },
             data: [
-              [{ ...qLabel(qTxt(1, 'alta', 'alta'), 'insideTopRight'), coord: [divX, avgY] }, { coord: [xMax, 'max'] }],
-              [{ ...qLabel(qTxt(3, 'baja', 'alta'), 'insideTopLeft'), coord: [xMin, avgY], itemStyle: { color: 'transparent' } }, { coord: [divX, 'max'] }],
-              [{ ...qLabel(qTxt(2, 'alta', 'baja'), 'insideBottomRight'), coord: [divX, 0], itemStyle: { color: 'transparent' } }, { coord: [xMax, avgY] }],
-              [{ ...qLabel(qTxt(4, 'baja', 'baja'), 'insideBottomLeft'), coord: [xMin, 0] }, { coord: [divX, avgY] }],
+              [{ ...qLabel(qTxt(1, 'alta', 'alta'), 'top'), coord: [divX, avgY] }, { coord: [xMax, 'max'] }],
+              [{ ...qLabel(qTxt(3, 'baja', 'alta'), 'top'), coord: [xMin, avgY], itemStyle: { color: 'transparent' } }, { coord: [divX, 'max'] }],
+              [{ ...qLabel(qTxt(2, 'alta', 'baja'), 'insideTopRight'), coord: [divX, yMin], itemStyle: { color: 'transparent' } }, { coord: [xMax, avgY] }],
+              [{ ...qLabel(qTxt(4, 'baja', 'baja'), 'insideTopLeft'), coord: [xMin, yMin] }, { coord: [divX, avgY] }],
             ],
           },
           markLine: {
@@ -235,7 +256,6 @@
         },
         {
           id: 'main', type: 'scatter', data, z: 2,
-          universalTransition: { enabled: true },
           label: {
             position: 'top', distance: 4, color: TT.text, fontSize: 11, fontWeight: 600, fontFamily: 'Inter',
             formatter: p => C.shortName(p.name, 22), textBorderColor: TT.surface, textBorderWidth: 3,
@@ -295,7 +315,6 @@
       ] : [],
       series: [{
         id: 'main', type: 'bar', data, barMaxWidth: 18, barCategoryGap: '28%',
-        universalTransition: { enabled: true },
         showBackground: true, backgroundStyle: { color: TT.name === 'dark' ? 'rgba(255,255,255,.03)' : 'rgba(29,32,65,.03)', borderRadius: [0, 4, 4, 0] },
         label: { show: true, position: 'right', color: TT.text2, fontSize: 11, fontFamily: 'Inter', formatter: p => isMoney ? moneyShort(p.value) : p.value },
         emphasis: { focus: 'self', itemStyle: { borderColor: TT.ring, borderWidth: 2 } },
@@ -314,6 +333,7 @@
   }
 
   function renderMain(fresh) {
+    $('#vScale').classList.toggle('disabled', state.view === 'ranking');
     state.data.maxDeudaAll = Math.max(...state.data.filas.map(f => f.deuda));
     main.setOption(buildMain(T), { notMerge: !!fresh, replaceMerge: fresh ? undefined : ['series', 'xAxis', 'yAxis', 'dataZoom'] });
     $('#chartTitle').textContent = state.view === 'ranking'
@@ -323,6 +343,7 @@
       ? (state.list.length > 22 ? 'Desplaza con la rueda del ratón o la barra lateral · clic para seleccionar' : 'Clic en una barra para seleccionarla')
       : (state.data.ejeY === 'historico'
         ? 'Eje vertical = histórico pagado · tamaño de la burbuja = deuda vigente · clic para seleccionar empresas'
+          + (state.matrixFloor ? ` · las empresas sin pagos históricos están en la línea inferior` : '')
         : 'El Excel no trae «Histórico pagado»: el eje vertical muestra la deuda · tamaño = deuda vigente');
   }
 
@@ -466,10 +487,10 @@
     };
     const divX = d.divisoriaX;
     $('#criteria').innerHTML =
-      `<div class="crit-head"><h2>¿Desde cuánto es alto o bajo?</h2><span class="hint">Valores en dólares (${C.CFG.moneda || 'USD'}) · calculados sobre las ${n} empresas del archivo · no cambian con los filtros</span></div>` +
+      `<div class="crit-head"><h2>¿Desde cuándo se considera alto o bajo?</h2><span class="hint">Valores en dólares (${C.CFG.moneda || 'USD'}) · calculados sobre las ${n} empresas del archivo · no cambian con los filtros</span></div>` +
       (d.tieneHistorico ? card(ico.hist, 'Histórico pagado · eje vertical', `desde ${money(d.promHist)}`, `menos de ${money(d.promHist)}`, 'Divisoria = promedio del histórico. Es la línea punteada horizontal y define los cuadrantes 1 a 4.') : '') +
       card(ico.deuda, 'Deuda vigente · tamaño de la burbuja', `desde ${money(d.promDeuda)}`, `menos de ${money(d.promDeuda)}`, 'Divisoria = promedio de la deuda. A mayor deuda, más grande la burbuja.') +
-      card(ico.imp, 'Importancia operativa', `mayor que ${divX}`, `${divX} o menos`, `Divisoria tomada de la celda B2 del Excel.`);
+      card(ico.imp, 'Importancia operativa · eje horizontal', `mayor que ${divX}`, `${divX} o menos`, `Escala 1 a 10 definida en mesa de trabajo entre <b>Operaciones</b>, <b>Tesorería (Dir. Finanzas)</b> y <b>Procura</b>.`);
   }
 
   function renderDQ() {
@@ -477,6 +498,8 @@
     const sinTipo = d.filas.filter(f => f.tipo === TIPOS.NA).length;
     const items = [];
     if (d.duplicados.length) items.push(`<b>Posibles nombres repetidos:</b> ${d.duplicados.map(g => esc(g.join(' / '))).join(' · ')}. Verifica si se trata de la misma empresa para no duplicar su deuda.`);
+    if (d.negativos.length) items.push(`<b>Saldo por pagar negativo:</b> ${d.negativos.map(f => `${esc(f.empresa)} (${money(f.deudaOriginal)})`).join(' · ')}. Indica un pago mayor a lo facturado o un ajuste pendiente; en el dashboard se toma como deuda $0.`);
+    if (d.sinImportancia.length) items.push(`<b>${d.sinImportancia.length} empresas sin importancia operativa:</b> aparecen en el ranking, la tabla y los totales, pero no en la matriz.`);
     if (sinTipo) items.push(`<b>${sinTipo} empresas sin tipo</b> (Proveedor / Prestador de servicios / Ambos). Se cuentan en el total, pero no en los totales por categoría.`);
     el.hidden = !items.length;
     el.innerHTML = items.length ? `<h3>Calidad de datos</h3><ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>` : '';
@@ -566,15 +589,42 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
 
-  /* ---------------- Ventana de análisis ---------------- */
+  /* ---------------- Vista de análisis (misma página) ---------------- */
   function openCompare() {
     if (!state.sel.size) return;
-    const ids = Array.from(state.sel);
-    const metric = state.f.sort === 'empresa' ? 'deuda' : state.f.sort;
-    const w = window.open(`compare.html#ids=${ids.join(',')}&m=${metric}`, 'colven-analisis');
-    if (!w) toast('El navegador bloqueó la ventana emergente. Permite ventanas emergentes para este sitio.', true);
-    else w.focus();
+    if (location.hash !== '#analisis') location.hash = 'analisis'; // dispara route()
+    else route();
   }
+  function goHome() {
+    if (location.hash) history.pushState(null, '', location.pathname + location.search);
+    route();
+  }
+  /** Muestra la vista correcta según la dirección (#analisis = análisis). */
+  function route() {
+    if (!state.data) return;
+    const wantAnalisis = location.hash === '#analisis' && state.sel.size > 0;
+    if (location.hash === '#analisis' && !wantAnalisis) history.replaceState(null, '', location.pathname + location.search);
+    state.route = wantAnalisis ? 'analisis' : 'panel';
+    $('#viewPanel').hidden = wantAnalisis;
+    $('#viewAnalisis').hidden = !wantAnalisis;
+    $('#btnCompare').hidden = wantAnalisis;
+    window.scrollTo({ top: 0, behavior: 'instant' in document.documentElement.style ? 'instant' : 'auto' });
+    if (wantAnalisis) {
+      main.dispatchAction({ type: 'hideTip' });
+      const metric = state.f.sort === 'empresa' ? 'deuda' : state.f.sort;
+      window.COLVEN_ANALISIS.show(metric);
+    } else {
+      requestAnimationFrame(() => {
+        main.resize(); quad.resize();
+        main.clear(); renderMain(true); renderQuad();
+        renderTable(); renderSelection(); renderOverlap(state.summary);
+      });
+    }
+  }
+  window.COLVEN_APP = {
+    // la vista de análisis avisa cuando agrega o quita empresas
+    selectionChanged() { renderSelection(); if (!state.sel.size) goHome(); },
+  };
 
   /* ---------------- Eventos ---------------- */
   function bindUI() {
@@ -596,7 +646,21 @@
       $$('#fTipo button').forEach(b => b.classList.toggle('on', b.dataset.v === 'all'));
       syncDir(); update(true);
     });
-    segment('#vView', v => { state.view = v; update(); });
+    segment('#vView', v => {
+      if (state.view === v) return;
+      state.view = v;
+      // redibujo limpio: evita que queden burbujas o barras "congeladas" de la vista anterior
+      main.dispatchAction({ type: 'downplay', seriesId: 'main' });
+      main.dispatchAction({ type: 'hideTip' });
+      hoverRow = null;
+      main.clear();
+      update(true);
+    });
+    segment('#vScale', v => { state.yScale = v; main.clear(); renderMain(true); });
+    window.addEventListener('hashchange', route);
+    window.addEventListener('popstate', route);
+    $('#homeLink').addEventListener('click', e => { e.preventDefault(); goHome(); });
+    $('#aBack').addEventListener('click', goHome);
 
     $('#legend').addEventListener('click', e => {
       const b = e.target.closest('.lg-item'); if (!b || !b.dataset.f) return;
