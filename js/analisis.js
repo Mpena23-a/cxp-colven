@@ -248,6 +248,7 @@
         </div>`;
     }
     $('#aSelHint').textContent = `${s.n} seleccionadas`;
+    C.renderFavor($('#aFavor'), s, st.data, T, true);
   }
 
   function renderList() {
@@ -294,7 +295,8 @@
         { label: 'Total prestadores de servicios', value: money(s.serv), color: TT.tipo[TIPOS.SERV] },
         { label: 'Total proveedores', value: money(s.prov), color: TT.tipo[TIPOS.PROV] },
       ],
-      note: s.nAmbos ? `${s.nAmbos} empresas son proveedor y prestador (${money(s.ambos)}): no se duplican en el total.` : '',
+      note: [s.nAmbos ? `${s.nAmbos} empresas son proveedor y prestador (${money(s.ambos)}): no se duplican en el total.` : '',
+             s.aFavor ? `Saldo a favor de Colven: ${money(s.aFavor)} (no restado de la deuda).` : ''].filter(Boolean).join(' · '),
       fileName: `colven-analisis-${st.type}-${st.metric}-${C.stamp()}${theme === 'light' ? '-blanco' : theme === 'transparent' ? '-transparente' : ''}.png`,
     }).then(() => toast('Imagen descargada'));
   }

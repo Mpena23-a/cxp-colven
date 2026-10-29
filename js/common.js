@@ -179,7 +179,9 @@
       historico: isNaN(+f.historico) || f.historico == null ? null : +f.historico,
       tipo: normTipo(f.tipo),
     }));
-    filas.forEach(f => { if (f.deudaOriginal < -0.5) negativos.push(f); });
+    // Saldo a favor de Colven: «US$ POR PAGAR» negativo (se pagó más de lo asignado).
+    // NO se resta de la deuda: la deuda de esa empresa queda en $0 y el saldo se informa aparte.
+    filas.forEach(f => { f.aFavor = f.deudaOriginal < -0.5 ? -f.deudaOriginal : 0; if (f.aFavor) negativos.push(f); });
     const sinImportancia = filas.filter(f => f.importancia == null || isNaN(f.importancia));
     sinImportancia.forEach(f => { f.importancia = null; });
     const imps = filas.map(f => f.importancia).filter(v => v != null);
@@ -239,14 +241,16 @@
 
   /* ---------- Resumen (sin doble conteo) ---------- */
   function summarize(list) {
-    const s = { n: list.length, total: 0, prov: 0, serv: 0, ambos: 0, na: 0, nProv: 0, nServ: 0, nAmbos: 0, nNa: 0, soloProv: 0, soloServ: 0, nSoloProv: 0, nSoloServ: 0, hist: 0, ambosList: [] };
+    const s = { n: list.length, total: 0, prov: 0, serv: 0, ambos: 0, na: 0, nProv: 0, nServ: 0, nAmbos: 0, nNa: 0, soloProv: 0, soloServ: 0, nSoloProv: 0, nSoloServ: 0, hist: 0, ambosList: [], aFavor: 0, aFavorList: [] };
     list.forEach(f => {
       s.total += f.deuda; s.hist += f.historico || 0;
       if (f.tipo === TIPOS.PROV) { s.soloProv += f.deuda; s.nSoloProv++; }
       if (f.tipo === TIPOS.SERV) { s.soloServ += f.deuda; s.nSoloServ++; }
       if (f.tipo === TIPOS.AMBOS) { s.ambos += f.deuda; s.nAmbos++; s.ambosList.push(f); }
       if (f.tipo === TIPOS.NA) { s.na += f.deuda; s.nNa++; }
+      if (f.aFavor) { s.aFavor += f.aFavor; s.aFavorList.push(f); }
     });
+    s.aFavorList.sort((a, b) => b.aFavor - a.aFavor);
     s.prov = s.soloProv + s.ambos; s.nProv = s.nSoloProv + s.nAmbos;
     s.serv = s.soloServ + s.ambos; s.nServ = s.nSoloServ + s.nAmbos;
     s.ambosList.sort((a, b) => b.deuda - a.deuda);
@@ -269,6 +273,36 @@
     });
   }
   setCuadrantes('historico');
+
+  /* ---------- Cuadro «Saldo a favor de Colven» ---------- */
+  function renderFavor(el, s, data, T, seleccion) {
+    if (!el) return;
+    if (!s.aFavor) { el.hidden = true; el.innerHTML = ''; return; }
+    el.hidden = false;
+    const n = s.aFavorList.length;
+    el.innerHTML = `
+      <div class="favor-icon"><svg viewBox="0 0 24 24"><path d="M12 3v18M17 7.5c0-1.9-2.2-3.5-5-3.5s-5 1.6-5 3.5S9.2 11 12 11.5s5 1.6 5 3.5-2.2 3.5-5 3.5-5-1.6-5-3.5"/></svg></div>
+      <div class="favor-body">
+        <div class="favor-head">
+          <div>
+            <span class="favor-kicker">Saldo a favor de Colven</span>
+            <h3>${money(s.aFavor)} <small>con ${n} ${n === 1 ? 'proveedor' : 'proveedores'}${seleccion ? ' de la selección' : ''}</small></h3>
+          </div>
+          <span class="favor-note">Se pagó más de lo asignado en sus órdenes (ODC/ODS). <b>No se resta de la deuda</b>: la deuda de ${n === 1 ? 'este proveedor figura' : 'estos proveedores figura'} en $0.</span>
+        </div>
+        <table class="favor-table">
+          <thead><tr><th>Proveedor</th><th>Tipo</th><th class="num">Histórico pagado</th><th class="num">Saldo a favor</th></tr></thead>
+          <tbody>${s.aFavorList.map(f => `
+            <tr>
+              <td class="c-name">${esc(f.empresa)}</td>
+              <td><span class="tag" style="--c:${T.tipo[f.tipo]}">${esc(TIPO_CORTO[f.tipo])}</span></td>
+              <td class="num">${f.historico != null ? money(f.historico) : '—'}</td>
+              <td class="num"><b>${money(f.aFavor)}</b></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
 
   /* ---------- Animación de cifras ---------- */
   function countUp(el, to, fmt, dur = 700) {
@@ -375,6 +409,7 @@
       <div class="tt-tipo"><i style="background:${c}"></i>${esc(TIPO_CORTO[f.tipo])}</div>
       <table>
         <tr><td>Deuda vigente</td><td><b>${money(f.deuda)}</b></td></tr>
+        ${f.aFavor ? `<tr class="tt-favor"><td>Saldo a favor de Colven</td><td><b>${money(f.aFavor)}</b></td></tr>` : ''}
         ${f.historico != null ? `<tr><td>Histórico pagado</td><td>${money(f.historico)}</td></tr>
         <tr><td>Deuda sobre histórico</td><td>${f.historico ? pct(f.deuda / f.historico) : '—'}</td></tr>` : ''}
         <tr><td>Importancia operativa</td><td>${f.importancia ?? '—'}</td></tr>
@@ -396,6 +431,6 @@
     CFG, TIPOS, TIPO_ORDEN, TIPO_CORTO, THEMES, CUADRANTES,
     money, moneyShort, pct, int, esc, norm, shortName, fechaCorte,
     parseWorkbook, prepare, loadData, summarize, countUp,
-    exportChartPNG, slug, stamp, tooltipHTML, tooltipBase,
+    exportChartPNG, slug, stamp, tooltipHTML, tooltipBase, renderFavor,
   };
 })();

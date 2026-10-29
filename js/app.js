@@ -381,6 +381,7 @@
     renderCompo(s);
     renderQuad();
     renderOverlap(s);
+    C.renderFavor($('#favor'), s, state.data, T);
   }
 
   function renderCompo(s) {
@@ -498,7 +499,6 @@
     const sinTipo = d.filas.filter(f => f.tipo === TIPOS.NA).length;
     const items = [];
     if (d.duplicados.length) items.push(`<b>Posibles nombres repetidos:</b> ${d.duplicados.map(g => esc(g.join(' / '))).join(' · ')}. Verifica si se trata de la misma empresa para no duplicar su deuda.`);
-    if (d.negativos.length) items.push(`<b>Saldo por pagar negativo:</b> ${d.negativos.map(f => `${esc(f.empresa)} (${money(f.deudaOriginal)})`).join(' · ')}. Indica un pago mayor a lo facturado o un ajuste pendiente; en el dashboard se toma como deuda $0.`);
     if (d.sinImportancia.length) items.push(`<b>${d.sinImportancia.length} empresas sin importancia operativa:</b> aparecen en el ranking, la tabla y los totales, pero no en la matriz.`);
     if (sinTipo) items.push(`<b>${sinTipo} empresas sin tipo</b> (Proveedor / Prestador de servicios / Ambos). Se cuentan en el total, pero no en los totales por categoría.`);
     el.hidden = !items.length;
@@ -517,7 +517,7 @@
         <td class="c-name">${esc(f.empresa)}</td>
         <td><span class="tag" style="--c:${T.tipo[f.tipo]}">${esc(C.TIPO_CORTO[f.tipo])}</span></td>
         <td class="num">${f.importancia ?? '—'}</td>
-        <td class="num"><b>${money(f.deuda)}</b></td>
+        <td class="num"><b>${money(f.deuda)}</b>${f.aFavor ? `<span class="favor-tag" title="Saldo a favor de Colven">+${moneyShort(f.aFavor)} a favor</span>` : ''}</td>
         <td class="num"><span class="pbar"><i style="width:${Math.min(100, f.deuda / tot * 100 * 4)}%"></i></span>${pct(f.deuda / tot)}</td>
         <td class="num">${f.historico != null ? money(f.historico) : '—'}</td>
         <td><span class="q q${f.cuadrante}">${f.cuadrante}</span> ${CUADRANTES[f.cuadrante].short}</td>
@@ -574,7 +574,8 @@
       title: $('#chartTitle').textContent,
       subtitle: filterDescription() + ` · ${s.n} empresas`,
       kpis: theme === 'transparent' ? null : kpis,
-      note: s.nAmbos ? `${s.nAmbos} empresas son proveedor y prestador (${money(s.ambos)}): no se duplican en el total.` : '',
+      note: [s.nAmbos ? `${s.nAmbos} empresas son proveedor y prestador (${money(s.ambos)}): no se duplican en el total.` : '',
+             s.aFavor ? `Saldo a favor de Colven: ${money(s.aFavor)} (no restado de la deuda).` : ''].filter(Boolean).join(' · '),
       fileName: `colven-cxp-${state.view}-${C.stamp()}${theme === 'light' ? '-blanco' : theme === 'transparent' ? '-transparente' : ''}.png`,
     }).then(() => toast('Imagen descargada'));
   }

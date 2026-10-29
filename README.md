@@ -19,7 +19,7 @@ Panel interactivo de la deuda con proveedores y prestadores de servicios de **Co
 3. Para actualizar, sube a la carpeta `data/` el Excel nuevo **con el mismo nombre** (reemplaza al anterior) y haz «Commit changes».
 4. Cuando las cifras sean definitivas, en `js/config.js` cambia `datosDeEjemplo: false`.
 
-> Saldos por pagar negativos (p. ej. TOP DRIVE) se muestran como deuda $0 y se listan en «Calidad de datos». Las empresas sin importancia operativa no aparecen en la matriz, pero sí en el ranking, la tabla y los totales.
+> Saldos por pagar negativos (p. ej. TOP DRIVE) son **saldo a favor de Colven**: se muestran en un cuadro propio con el proveedor y el monto, y **no se restan de la deuda** (la deuda de ese proveedor figura en $0). Las empresas sin importancia operativa no aparecen en la matriz, pero sí en el ranking, la tabla y los totales.
 
 `js/data-fallback.js` contiene una copia de los datos que se usa al abrir `index.html` con doble clic (sin servidor). En GitHub Pages siempre se lee el Excel.
 
